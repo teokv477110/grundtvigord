@@ -105,6 +105,13 @@ details.terms dt{font-weight:600}
 details.terms dd{margin:0}
 details.terms dd.en{font-style:italic;color:var(--prussian)}
 @media (max-width:44rem){details.terms dl{grid-template-columns:1fr}details.terms dd:not(.en){margin-bottom:.6rem}}
+.gres{margin-top:1rem}
+.gres:empty{display:none}
+.gres h4{margin:0 0 .4rem;font-size:1rem}
+.gres ul{list-style:none;margin:0;padding:0;display:grid;gap:.3rem}
+.gres li{padding:.35rem .6rem;border-radius:.3rem;background:var(--prussian-soft)}
+.gres li.top{background:var(--mark)}
+.gres b{font-weight:700}
 #loading{padding:2rem 0;color:var(--soft)}
 @media (prefers-reduced-motion:no-preference){.fill{transition:width .35s ease}}
 </style>
@@ -135,6 +142,7 @@ details.terms dd.en{font-style:italic;color:var(--prussian)}
       <button id="go">Slå op</button>
     </div>
     <div class="chips" id="chips"><span>Prøv:</span></div>
+    <div class="gres" id="gres" aria-live="polite"></div>
     <div class="cols">
       <div class="col clean"><h3>Udgivne tekster</h3><p class="sub">Rettet og kontrolleret af udgiverne</p><ol class="nb" id="nb26"></ol><p class="msg" id="m26"></p></div>
       <div class="col dirty"><h3>Rå OCR</h3><p class="sub">De samme tekster, før udgiverne rettede dem</p><ol class="nb" id="nb21"></ol><p class="msg" id="m21"></p></div>
@@ -270,6 +278,7 @@ const q=document.getElementById('q'), g=document.getElementById('g');
 function lookup(){
   const w=norm(q.value); if(!w) return;
   const guesses=new Set(g.value.split(',').map(norm).filter(Boolean));
+  setTimeout(()=>showGuesses(w,guesses),0);
   const res={m26:neighbours(M.m26,w,15),m21:neighbours(M.m21,w,15)};
   const sets={m26:new Set((res.m26||[]).map(x=>x.w)),m21:new Set((res.m21||[]).map(x=>x.w))};
   for(const k of ['m26','m21']){
@@ -279,6 +288,21 @@ function lookup(){
     for(const r of res[k]){ const li=el('li'); if(guesses.has(r.w)) li.classList.add('hit'); if(res.m26&&res.m21&&!other.has(r.w)) li.classList.add('only');
       li.append(el('span','w',r.w), el('span','meta',fint.format(r.c)+' ×')); ol.append(li) }
   }
+}
+function rankOf(m,w,x){ const i=m.idx.get(w), j=m.idx.get(x); if(i===undefined||j===undefined) return null; const s0=dot(m,i,j); let r=1; for(let k=0;k<m.words.length;k++){ if(k===i||k===j) continue; if(dot(m,i,k)>s0) r++ } return r }
+function place(r){ return r===null?'findes ikke i modellen':'nr. '+fint.format(r) }
+function showGuesses(w,guesses){
+  const box=document.getElementById('gres'); box.innerHTML='';
+  if(!guesses.size) return;
+  box.append(el('h4','','Jeres gæt – hvor tæt på »'+w+'« ligger de?'));
+  const ul=el('ul');
+  for(const x of guesses){ if(x===w) continue;
+    const a=rankOf(M.m26,w,x), b=rankOf(M.m21,w,x), li=el('li');
+    if((a!==null&&a<=15)||(b!==null&&b<=15)) li.classList.add('top');
+    const bx=el('b','',x); li.append(bx, document.createTextNode((a===null&&b===null)?': findes ikke i modellerne.'+suggest(x):': '+place(a)+' i udgivne tekster, '+place(b)+' i rå OCR'+(((a!==null&&a<=15)||(b!==null&&b<=15))?' – godt gæt!':'')));
+    ul.append(li) }
+  box.append(ul);
+  const n=document.createElement('p'); n.className='note'; n.textContent='Nr. 1 er det ord, der ligger allertættest. Modellen kender ca. 15.000–17.000 ord.'; box.append(n);
 }
 document.getElementById('go').addEventListener('click',lookup);
 [q,g].forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')lookup()}));
