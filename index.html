@@ -42,7 +42,7 @@ nav{display:flex;gap:.25rem;flex-wrap:wrap;margin:1.25rem 0 1.5rem}
 nav a{font-weight:600;color:var(--ink);text-decoration:none;padding:.45rem .9rem;border:1px solid var(--rule);border-radius:2rem;background:var(--sheet)}
 nav a[aria-current="page"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 nav a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--prussian);outline-offset:2px}
-section[hidden]{display:none}
+section[hidden], #nb-results[hidden]{display:none}
 h2{font-size:1.6rem;margin:0 0 .25rem}
 .howto{max-width:46rem;color:var(--soft);margin:0 0 1.25rem}
 .panel{background:var(--sheet);border:1px solid var(--rule);border-radius:.5rem;padding:1.25rem}
@@ -125,9 +125,9 @@ details.terms dd.en{font-style:italic;color:var(--prussian)}
 
 <nav aria-label="Øvelser">
   <a href="#ordnaboer">Ordnaboer</a>
+  <a href="#vaev">Ordnetværk</a>
   <a href="#farver">Farvetesten</a>
   <a href="#udraab">Udråbstegn</a>
-  <a href="#vaev">Ordnetværk</a>
 </nav>
 
 <div id="loading">Indlæser modellerne …</div>
@@ -142,12 +142,15 @@ details.terms dd.en{font-style:italic;color:var(--prussian)}
       <button id="go">Slå op</button>
     </div>
     <div class="chips" id="chips"><span>Prøv:</span></div>
+    <p class="msg" id="guess-msg" aria-live="polite"></p>
+    <div id="nb-results" hidden>
     <div class="gres" id="gres" aria-live="polite"></div>
     <div class="cols">
       <div class="col clean"><h3>Udgivne tekster</h3><p class="sub">Rettet og kontrolleret af udgiverne</p><ol class="nb" id="nb26"></ol><p class="msg" id="m26"></p></div>
       <div class="col dirty"><h3>Rå OCR</h3><p class="sub">De samme tekster, før udgiverne rettede dem</p><ol class="nb" id="nb21"></ol><p class="msg" id="m21"></p></div>
     </div>
     <p class="note">Tallet til højre er, hvor mange gange ordet forekommer i korpusset. Ord i kursiv findes kun i den ene liste. Kig efter mærkelige ord i højre side: er det et ord, Grundtvig har skrevet, eller en fejl fra maskinen, der læste det gamle tryk? Prøv især almindelige ord som ikke, først og kun.</p>
+    </div>
     <details class="terms"><summary>Fagord på dansk og engelsk</summary><dl>
       <dt>Sprogmodel</dt><dd class="en">language model</dd><dd>Et program, der har lært mønstre i sprog ud fra store mængder tekst.</dd>
       <dt>Ordvektor</dt><dd class="en">word embedding</dd><dd>Et ord oversat til en række tal, så computeren kan regne på, hvor tæt ord ligger på hinanden.</dd>
@@ -178,7 +181,7 @@ details.terms dd.en{font-style:italic;color:var(--prussian)}
       <div><h3 style="margin:1.25rem 0 0;font-size:1.1rem">Sammenlign: gennemsnit for alle ni farver</h3><div class="bars" id="cmp"></div></div>
     </div>
     <p class="msg" id="cmsg"></p>
-    <p class="note">Bemærk: Et ord, der sjældent forekommer, er ikke med i modellen. Abstrakte ord som <em>natur</em> ligger også langt fra farverne. Sammenlign derfor Christus med andre ord, ikke kun med nul.</p>
+    <p class="note">Bemærk: Et tal som 0,21 siger ikke meget alene. Næsten alle ord har en vis lighed med farverne, så sammenlign Christus med andre ord for at se, om den ligger højt eller lavt. Abstrakte ord som <em>natur</em> ligger også langt fra farverne. Et ord, der forekommer sjældent, er ikke med i modellen – derfor bruger vi <em>gule</em> i stedet for <em>gul</em>.</p>
     <details class="terms"><summary>Fagord på dansk og engelsk</summary><dl>
       <dt>Lighed</dt><dd class="en">cosine similarity</dd><dd>Et tal for, hvor ens to ords talrækker er. Tæt på 1 betyder meget ens, tæt på 0 betyder ingen forbindelse.</dd>
       <dt>Vektorrum</dt><dd class="en">vector space</dd><dd>Det »rum«, ordene placeres i, hvor afstand betyder forskel i brug.</dd>
@@ -217,7 +220,7 @@ details.terms dd.en{font-style:italic;color:var(--prussian)}
   <p class="howto">Skriv et eller flere ord adskilt af komma. Hvert ord får sine nærmeste naboer med, og der trækkes en tråd mellem alle ord, der ligger tæt på hinanden. Jo tykkere tråd, jo tættere forbindelse. Klik på et ord for at føje det til netværket, og træk i ordene for at flytte dem.</p>
   <div class="panel">
     <div class="row">
-      <div style="flex:1;min-width:16rem"><label for="wq">Ord</label><input id="wq" type="text" autocomplete="off" spellcheck="false" style="width:100%" value="christus, blaa, grøn, gul, rød, brun, sort, hvid, guld, sølv"></div>
+      <div style="flex:1;min-width:16rem"><label for="wq">Ord</label><input id="wq" type="text" autocomplete="off" spellcheck="false" style="width:100%" value="christus, blaa, grøn, gule, rød, brun, sort, hvid, guld, sølv"></div>
       <button id="wgo">Tegn netværk</button>
       <div class="toggle" role="group" aria-label="Vælg model" id="wtog">
         <button aria-pressed="true" data-m="m26">Udgivne tekster</button>
@@ -275,10 +278,22 @@ const fint=new Intl.NumberFormat('da-DK');
 
 /* Ordnaboer */
 const q=document.getElementById('q'), g=document.getElementById('g');
+const nbResults=document.getElementById('nb-results'), guessMsg=document.getElementById('guess-msg');
+function hideNeighbours(){
+  nbResults.hidden=true;
+  guessMsg.textContent='';
+}
 function lookup(){
+  hideNeighbours();
   const w=norm(q.value); if(!w) return;
-  const guesses=new Set(g.value.split(',').map(norm).filter(Boolean));
-  setTimeout(()=>showGuesses(w,guesses),0);
+  const guesses=new Set(g.value.split(',').map(norm).filter(x=>x&&x!==w));
+  if(!guesses.size){
+    guessMsg.textContent='Skriv mindst ét andet ord som gæt, før I slår op.';
+    g.focus();
+    return;
+  }
+  showGuesses(w,guesses);
+  nbResults.hidden=false;
   const res={m26:neighbours(M.m26,w,15),m21:neighbours(M.m21,w,15)};
   const sets={m26:new Set((res.m26||[]).map(x=>x.w)),m21:new Set((res.m21||[]).map(x=>x.w))};
   for(const k of ['m26','m21']){
@@ -296,8 +311,7 @@ function showGuesses(w,guesses){
   if(!guesses.size) return;
   box.append(el('h4','','Jeres gæt – hvor tæt på »'+w+'« ligger de?'));
   const ul=el('ul');
-  for(const x of guesses){ if(x===w) continue;
-    const a=rankOf(M.m26,w,x), b=rankOf(M.m21,w,x), li=el('li');
+  for(const x of guesses){ const a=rankOf(M.m26,w,x), b=rankOf(M.m21,w,x), li=el('li');
     if((a!==null&&a<=15)||(b!==null&&b<=15)) li.classList.add('top');
     const bx=el('b','',x); li.append(bx, document.createTextNode((a===null&&b===null)?': findes ikke i modellerne.'+suggest(x):': '+place(a)+' i udgivne tekster, '+place(b)+' i rå OCR'+(((a!==null&&a<=15)||(b!==null&&b<=15))?' – godt gæt!':'')));
     ul.append(li) }
@@ -306,11 +320,13 @@ function showGuesses(w,guesses){
 }
 document.getElementById('go').addEventListener('click',lookup);
 [q,g].forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')lookup()}));
+q.addEventListener('input',()=>{g.value='';hideNeighbours()});
+g.addEventListener('input',hideNeighbours);
 const chips=document.getElementById('chips');
-['christus','gud','aand','danmark','ikke','først','findes','kun','efter','mørke'].forEach(w=>{const b=el('button','ghost',w); b.addEventListener('click',()=>{q.value=w;lookup()}); chips.append(b)});
+['christus','gud','aand','danmark','ikke','først','findes','kun','efter','mørke'].forEach(w=>{const b=el('button','ghost',w); b.addEventListener('click',()=>{q.value=w;g.value='';hideNeighbours();g.focus()}); chips.append(b)});
 
 /* Farver */
-const COLS=[['blaa','#3b6fb6'],['grøn','#3f8a4e'],['gul','#e2c23b'],['rød','#b8322f'],['brun','#7a5232'],['sort','#111111'],['hvid','#ffffff'],['guld','#c9a227'],['sølv','#b9bec6']];
+const COLS=[['blaa','#3b6fb6'],['grøn','#3f8a4e'],['gule','#e2c23b'],['rød','#b8322f'],['brun','#7a5232'],['sort','#111111'],['hvid','#ffffff'],['guld','#c9a227'],['sølv','#b9bec6']];
 const CMP=['christus','jesus','aand','gud','danmark','sol','himmel','blod','rose','natur'];
 let cm='m26';
 function colourMean(m,w){const i=m.idx.get(w); if(i===undefined) return null; const cs=COLS.map(c=>m.idx.get(c[0])).filter(x=>x!==undefined); return cs.reduce((s,j)=>s+dot(m,i,j),0)/cs.length}
@@ -365,7 +381,7 @@ function weave(){
   N.forEach(n=>{ const s=n.g*ang; n.x=W/2+Math.cos(s)*170+(Math.random()-.5)*120; n.y=H/2+Math.sin(s)*150+(Math.random()-.5)*120; n.vx=0; n.vy=0 });
   const col=n=>{ const s=seeds[n.g]; return CHEX[s]||GP[n.g%GP.length] };
   const gl=sv('g',{}), gn=sv('g',{}); svg.append(gl,gn);
-  E.forEach(e=>{ e.el=sv('line',{'stroke-width':(1+(e.v-thr)*14).toFixed(2),'stroke-opacity':(.25+(e.v-thr)*1.5).toFixed(2)}); gl.append(e.el) });
+  E.forEach(e=>{ e.el=sv('line',{'stroke-width':(0.5+Math.max(0,e.v-0.35)*12).toFixed(2),'stroke-opacity':Math.min(.95,.25+Math.max(0,e.v-0.35)*1.4).toFixed(2)}); gl.append(e.el) });
   N.forEach(n=>{ const g=sv('g',{class:'node',tabindex:'0','aria-label':n.w}); n.c=sv('circle',{r:n.seed?11:6,fill:col(n)}); n.t=sv('text',{class:n.seed?'seed':'',dx:n.seed?14:9,dy:5}); n.t.textContent=n.w; g.append(n.c,n.t); gn.append(g); n.el=g;
     g.addEventListener('keydown',ev=>{ if(ev.key==='Enter') addSeed(n.w) }); drag(n) });
   sim={N,E,alpha:1};
@@ -396,7 +412,7 @@ wt.addEventListener('input',()=>{document.getElementById('wtv').textContent=fmt.
 tog('wtog',k=>{wm=k;weave()});
 const wch=document.getElementById('wchips');
 function setW(k){wm=k; document.querySelectorAll('#wtog button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.m===k))}
-[['Christus og farverne','christus, blaa, grøn, gul, rød, brun, sort, hvid, guld, sølv','m26',6],['Danmark og Norden','danmark, norden, folk','m26',8],['Aand og hjerte','aand, hjerte, ord','m26',8],['Find fejlene','ikke, først, kun, efter, findes','m21',8]].forEach(([l,v,mk,kk])=>{const b=el('button','ghost',l); b.addEventListener('click',()=>{document.getElementById('wq').value=v; setW(mk); wk.value=kk; document.getElementById('wkv').textContent=kk; weave()}); wch.append(b)});
+[['Christus og farverne','christus, blaa, grøn, gule, rød, brun, sort, hvid, guld, sølv','m26',6],['Danmark og Norden','danmark, norden, folk','m26',8],['Aand og hjerte','aand, hjerte, ord','m26',8],['Find fejlene','ikke, først, kun, efter, findes','m21',8]].forEach(([l,v,mk,kk])=>{const b=el('button','ghost',l); b.addEventListener('click',()=>{document.getElementById('wq').value=v; setW(mk); wk.value=kk; document.getElementById('wkv').textContent=kk; weave()}); wch.append(b)});
 
 /* Routing */
 const views=['ordnaboer','farver','udraab','vaev'];
@@ -407,7 +423,7 @@ window.addEventListener('hashchange',route);
 document.getElementById('loading').remove();
 let woven=false;
 window.addEventListener('hashchange',()=>{if(location.hash==='#vaev'&&!woven){woven=true;weave()}});
-route(); lookup(); colours(); excl('e26'); if(location.hash==='#vaev'){woven=true;weave()}
+route(); colours(); excl('e26'); if(location.hash==='#vaev'){woven=true;weave()}
 })();
 </script>
 </body>
